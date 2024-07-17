@@ -2,26 +2,30 @@ package auth
 
 import (
 	"context"
-	"github.com/carinfinin/auth_proto/gen/go/auth"
+	authV1 "github.com/carinfinin/auth_proto/gen/go/auth"
 	"google.golang.org/grpc"
 )
 
 type serverAPI struct {
-	auth_golang.UnimplementedAuthServer
+	authV1.UnimplementedAuthServer
 }
 
 func Register(gRPC *grpc.Server) {
-	auth_golang.RegisterAuthServer(gRPC, &serverAPI{})
+	authV1.RegisterAuthServer(gRPC, &serverAPI{})
 }
 
-func (s *serverAPI) Login(ctx context.Context, in *auth_golang.LoginRequest) (*auth_golang.LoginResponse, error) {
+func (s *serverAPI) Login(ctx context.Context, in *authV1.LoginRequest) (*authV1.LoginResponse, error) {
 	panic("implement me Login")
 }
 
-func (s *serverAPI) Register(ctx context.Context, in *auth_golang.LoginRequest) (*auth_golang.LoginResponse, error) {
-	panic("implement me Register")
-}
-
-func (s *serverAPI) IsAdmin(ctx context.Context, in *auth_golang.LoginRequest) (*auth_golang.LoginResponse, error) {
-	panic("implement me IsAdmin")
-}
+//func (s *serverAPI) Register(ctx context.Context, in *authV1.LoginRequest) (*authV1.LoginResponse, error) {
+//	panic("implement me Register")
+//}
+//
+//func (s *serverAPI) IsAdmin(ctx context.Context, in *authV1.LoginRequest) (*authV1.LoginResponse, error) {
+//	panic("implement me IsAdmin")
+//}
+//
+//func (s *serverAPI) mustEmbedUnimplementedAuthServer(ctx context.Context, in *authV1.LoginRequest) (*authV1.LoginResponse, error) {
+//	panic("implement me IsAdmin")
+//}
