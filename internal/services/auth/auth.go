@@ -2,6 +2,7 @@ package auth
 
 import (
 	"auth/internal/domain/models"
+	"auth/internal/lib/jwt"
 	"auth/internal/storage"
 	"context"
 	"errors"
@@ -12,6 +13,8 @@ import (
 )
 
 var ErrorInvalidCredentials = errors.New("invalid credentials")
+var ErrorInvalidApp = errors.New("invalid app id")
+var ErrorUserExists = errors.New("user already exists")
 
 type Auth struct {
 	log          *slog.Logger
@@ -27,7 +30,7 @@ type UserSaver interface {
 
 type UserProvider interface {
 	User(ctx context.Context, email string) (models.User, error)
-	IsAdmin(ctx context.Context, email string) (bool, error)
+	IsAdmin(ctx context.Context, userID int64) (bool, error)
 }
 
 type AppProvider interface {
@@ -85,7 +88,22 @@ func (a *Auth) Login(ctx context.Context, email string, password string, appID i
 		return "", fmt.Errorf("%s: %w", op, ErrorInvalidCredentials)
 	}
 
-	return "", nil
+	app, err := a.appProvider.App(ctx, appID)
+	if err != nil {
+		return "", fmt.Errorf("%s: %w", op, err)
+	}
+
+	token, err := jwt.NewToken(user, app, a.tokenTTL)
+	if err != nil {
+		a.log.Info("failed to generate token", slog.Attr{
+			Key:   "error",
+			Value: slog.StringValue(err.Error()),
+		})
+
+		return "", fmt.Errorf("%s: %w", op, err)
+	}
+
+	return token, nil
 
 }
 
@@ -113,6 +131,17 @@ func (a *Auth) RegisterNewUser(ctx context.Context, email string, password strin
 	id, err := a.userSaver.SaveUser(ctx, email, passHash)
 
 	if err != nil {
+
+		if errors.Is(err, storage.ErrorUserExists) {
+
+			slog.Warn("user already exists", slog.Attr{
+				Key:   "error",
+				Value: slog.StringValue(err.Error()),
+			})
+			return 0, fmt.Errorf("%s, %t", op, ErrorUserExists)
+
+		}
+
 		log.Error("failed to save user", slog.Attr{
 			Key:   "error",
 			Value: slog.StringValue(err.Error()),
@@ -127,7 +156,30 @@ func (a *Auth) RegisterNewUser(ctx context.Context, email string, password strin
 }
 
 // IsAdmin check if user is admin
-func (a *Auth) IsAdmin(cnt context.Context, userID int64) (bool, error) {
-	panic("not implemented")
+func (a *Auth) IsAdmin(ctx context.Context, userID int64) (bool, error) {
+	const op = "auth.IsAdmin"
 
+	log := a.log.With(
+		slog.String("op", op),
+		slog.Int64("userID", userID),
+	)
+
+	log.Info("checking if user is admin")
+
+	isAdmin, err := a.userProvider.IsAdmin(ctx, userID)
+	if err != nil {
+		if errors.Is(err, storage.ErrorAppNotFound) {
+
+			slog.Warn("app not found", slog.Attr{
+				Key:   "error",
+				Value: slog.StringValue(err.Error()),
+			})
+			return false, fmt.Errorf("%s, %t", op, ErrorInvalidApp)
+
+		}
+		return false, fmt.Errorf("%s, %t", op, err)
+	}
+	log.Info("checked if user is admin", slog.Bool("is_admin", isAdmin))
+
+	return isAdmin, nil
 }
